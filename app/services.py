@@ -34,12 +34,13 @@ def get_single_youtube_video(query: str) -> dict:
         return {"video_id": video_id, "title": f"YouTube Video ({video_id})"}
 
     ydl_opts = {
-        'extract_flat': True,
-        'skip_download': True,
-        'quiet': True,
-        'no_warnings': True,
-        'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    'quiet': True,
+    'skip_download': True,
+    'extract_flat': True,
+    'extractor_args': {
+        'youtube': {
+            'player_client': ['web_safari', 'android']
+            }
         }
     }
     
