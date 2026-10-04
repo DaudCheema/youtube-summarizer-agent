@@ -57,40 +57,39 @@ def get_single_youtube_video(query: str) -> dict:
     raise ValueError(f"No YouTube video results found for: {query}")
 
 
+import requests
+
 def fetch_official_captions(video_id: str) -> Optional[str]:
-    """Fetches manual or auto-generated captions via youtube-transcript-api."""
+    """Fetches manual or auto-generated captions, falling back to public Invidious proxies."""
+    # Attempt 1: Standard youtube-transcript-api
     try:
-        # Standard static call
-        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
-        
-        # 1. Try manual transcript (English or Urdu)
-        try:
-            transcript = transcript_list.find_manually_created_transcript(['en', 'en-US', 'en-GB', 'ur'])
-            data = transcript.fetch()
-            return " ".join([item['text'] for item in data])
-        except Exception:
-            pass
-
-        # 2. Try generated transcript
-        try:
-            transcript = transcript_list.find_generated_transcript(['en', 'en-US', 'en-GB', 'ur'])
-            data = transcript.fetch()
-            return " ".join([item['text'] for item in data])
-        except Exception:
-            pass
-
-        # 3. Fallback to any available transcript and translate/fetch
-        for t in transcript_list:
-            data = t.fetch()
-            return " ".join([item['text'] for item in data])
-
+        transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
+        if transcript_list:
+            return " ".join([item['text'] for item in transcript_list])
     except Exception:
-        # Direct fallback attempt
+        pass
+
+    # Attempt 2: Invidious Proxy (Bypasses Datacenter IP Bot Challenge)
+    instances = [
+        "https://inv.tux.pizza",
+        "https://invidious.nerdvpn.de",
+        "https://vid.puffyan.us"
+    ]
+    for inst in instances:
         try:
-            raw_transcript = YouTubeTranscriptApi.get_transcript(video_id)
-            return " ".join([item['text'] for item in raw_transcript])
+            res = requests.get(f"{inst}/api/v1/captions/{video_id}", timeout=5)
+            if res.status_code == 200:
+                captions = res.json().get("captions", [])
+                if captions:
+                    caption_url = inst + captions[0].get("url")
+                    cap_res = requests.get(caption_url, timeout=5)
+                    # Clean out basic XML/VTT tags
+                    clean_text = re.sub(r'<[^>]+>', ' ', cap_res.text)
+                    clean_text = re.sub(r'\s+', ' ', clean_text).strip()
+                    if len(clean_text) > 50:
+                        return clean_text
         except Exception:
-            return None
+            continue
 
     return None
 
